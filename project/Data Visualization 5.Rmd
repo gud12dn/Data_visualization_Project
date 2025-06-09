@@ -1,0 +1,240 @@
+---
+title: "Data Visualizaion 3"
+output: html_document
+date: "2025-04-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **Introduction**
+
+Employee attrition poses a significant challenge for modern organizations, affecting productivity, costs, and long-term growth. This project explores the factors influencing turnover by analyzing a real-world HR dataset through static visualizations. Using techniques such as dimensionality reduction, clustering, and feature-based modeling, the analysis reveals key employee profiles, identifies high-risk groups, and highlights patterns in satisfaction, income, and departmental trends. The goal is to provide actionable insights that support data-driven talent retention strategies and workforce planning in today’s competitive job market.
+
+### Dataset Description
+
+This dataset contains 1,470 records, each representing an employee with detailed demographic, professional, and organizational attributes. It includes 23 variables, such as age, gender, education, department, business travel frequency, salary, and tenure-related metrics. Additional features include overtime status, stock options, and attrition (whether the employee left the company). The data spans a range of departments, roles, and job levels, allowing for rich exploration of workforce dynamics.
+
+Although the dataset is synthetic and created for educational purposes, it reflects realistic patterns observed in corporate environments. The diverse set of variables enables comprehensive analysis of employee behavior, particularly in relation to turnover trends. Through visualizations and model-driven insights, the dataset supports exploration of which factors most influence attrition and how different employee groups compare in their likelihood to stay or leave.
+
+#### **Dataset Limitations:**
+
+1.  **Synthetic Nature**: The dataset is artificially generated for educational purposes and may not fully reflect real-world organizational structures or employee behaviors.
+
+2.  **Static Data**:  While attrition status is available, the dataset lacks detailed time-based records such as the exact timing of promotions, evaluations, or resignations, limiting long-term trend analysis.
+
+### Essential Questions
+
+1. What is the overall distribution of salaries among employees?
+
+2. How does employee attrition differ across age groups?
+
+3. Which departments have higher attrition rates?
+
+4. Is there a difference in salary distribution between employees who stay and those who leave?
+
+5. Can we identify clusters of employees based on numeric features, and do these differ by department?
+
+6. Which job roles offer higher salaries, and how might they relate to attrition or company structure?
+
+### Load the Data
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(tidymodels)
+library(recipes)   
+library(forcats)
+library(ggrepel)
+
+employee_path <- "/Users/hyoungwookim/Desktop/stat436_s25/homework/Employee.csv"
+
+employee_data <- read_csv(employee_path)
+
+head(employee_data)
+
+```
+
+
+### Visualization 1: Overall Attrition Distribution
+
+```{r}
+library(ggplot2)
+
+ggplot(employee_data, aes(x = Attrition, fill = Attrition)) +
+  geom_bar() +
+  labs(title = "Attrition Count",
+       x = "Attrition Status",
+       y = "Number of Employees") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#66CCFF")) +
+  theme_minimal()
+
+```
+Interpretation:
+This bar chart shows the overall attrition distribution in the dataset. The vast majority of employees did not leave the company ("No"), while only a small proportion did ("Yes"). This class imbalance is important to consider when building predictive models, as it may affect the accuracy and fairness of the results. The chart establishes a baseline understanding of how employee turnover appears across the organization.
+
+### Visualization 2: Attrition Rate by Age Group
+
+```{r}
+
+employee_data <- employee_data %>%
+  mutate(AgeGroup = case_when(
+    Age < 30 ~ "Under 30",
+    Age < 40 ~ "30s",
+    Age < 50 ~ "40s",
+    TRUE ~ "50+"
+  ))
+employee_data$AgeGroup <- factor(employee_data$AgeGroup,
+                                 levels = c("Under 30", "30s", "40s", "50+"))
+
+employee_data %>%
+  group_by(AgeGroup, Attrition) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(AgeGroup) %>%
+  mutate(percent = count / sum(count) * 100) %>%
+  ggplot(aes(x = AgeGroup, y = percent, fill = Attrition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Attrition Rate by Age Group",
+       x = "Age Group",
+       y = "Percentage of Employees") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#66CCFF")) +
+  theme_minimal()
+
+```
+
+Interpretation:
+This chart shows that employees under 30 are more likely to leave the company compared to other age groups. As age increases, the attrition rate tends to decrease, with the 50+ group showing no recorded turnover in this dataset. These results suggest that younger employees may be more likely to explore new opportunities or experience instability early in their careers, which can inform targeted retention strategies for early-career professionals.
+
+### Visualization 3: Salary Distribution by Attrition
+
+```{r}
+
+ggplot(employee_data, aes(x = Salary, fill = Attrition)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Salary Distribution by Attrition",
+       x = "Salary",
+       y = "Density") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#66CCFF")) +
+  theme_minimal()
+```
+
+Interpretation:
+This density plot compares the distribution of salaries between employees who stayed and those who left. The chart shows that employees who left the company ("Yes") tend to be concentrated at the lower end of the salary scale, while those who stayed ("No") are more widely distributed across higher salary ranges. This suggests that compensation may play a role in attrition, especially among lower-paid employees.
+
+
+### Visualization 4: Comparing Salary and Tenure by Attrition
+
+```{r}
+ggplot(employee_data, aes(x = Attrition, y = Salary, fill = Attrition)) +
+  geom_boxplot(outlier.shape = NA) +
+  labs(title = "Salary Distribution by Attrition",
+       x = "Attrition Status", y = "Salary") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#66CCFF")) +
+  theme_minimal()
+
+```
+
+Interpretation:
+This boxplot compares salary distributions between employees who stayed ("No") and those who left the company ("Yes"). The results show that employees who left tend to have slightly lower median salaries and a narrower overall range. This suggests that compensation could be a contributing factor to turnover, especially among lower-paid employees.
+
+### Visualization 5: PCA + Clustering + Facet by Department
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+numeric_vars <- employee_data %>%
+  select(Age, Salary, Education, `DistanceFromHome (KM)`,
+         YearsAtCompany, YearsInMostRecentRole, 
+         YearsSinceLastPromotion, YearsWithCurrManager)
+
+pca_result <- prcomp(numeric_vars, scale. = TRUE)
+pca_data <- as.data.frame(pca_result$x[, 1:2])  # PC1, PC2만
+
+set.seed(123)
+clusters <- kmeans(pca_data, centers = 3, nstart = 25)
+
+pca_data$Cluster <- as.factor(clusters$cluster)
+pca_data$Department <- employee_data$Department
+
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  facet_wrap(~ Department) +
+  labs(title = "PCA Clusters Faceted by Department",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+```
+
+Interpretation: This faceted PCA plot reveals the clustering structure of employees based on key numeric attributes such as age, salary, education, and tenure. Using k-means clustering (k = 3), we identified three distinct groups. When visualized by department, noticeable differences emerge: for instance, Sales and Technology show more well-defined and compact clusters, while Human Resources appears more dispersed. These patterns suggest that employee profiles—and potentially attrition risks—may be influenced by departmental context.
+
+
+### Visualization 6: Job Role vs. Average Salary (Bubble Chart)
+
+```{r}
+job_summary <- employee_data %>%
+  group_by(JobRole) %>%
+  summarise(
+    avg_salary = mean(Salary),
+    attrition_rate = mean(Attrition == "Yes") * 100,
+    count = n()
+  )
+
+ggplot(job_summary, aes(x = avg_salary, y = reorder(JobRole, avg_salary), size = avg_salary)) +
+  geom_point(color = "#6699FF", alpha = 0.7) +
+  labs(title = "Job Roles and Their Average Salaries",
+       x = "Average Salary (USD)",
+       y = "Job Role",
+       size = "Avg Salary") +
+  theme_minimal()
+
+```
+
+Interpretation: This bubble chart visualizes the average salary by job role in the organization. Larger bubbles indicate roles with higher average compensation. Roles such as HR Manager, Analytics Manager, and Engineering Manager stand out with significantly higher average salaries, while roles like Recruiter and Sales Representative are associated with lower compensation levels. This type of visualization is helpful in identifying compensation gaps across job roles and can inform decisions on salary structuring, especially in relation to retention risk.
+
+### Visualization 7: Top Feature Contributions to PC1 and PC2 (Bar Chart)
+```{r}
+
+numeric_employee <- employee_data %>%
+  select(where(is.numeric))
+
+employee_recipe <- recipe(~ ., data = numeric_employee) %>%
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), num_comp = 2)
+
+employee_pca <- prep(employee_recipe)
+
+pca_step <- employee_pca$steps[[2]]
+
+pca_loadings <- tidy(pca_step)
+
+top_loadings <- pca_loadings %>%
+  filter(component %in% c("PC1", "PC2")) %>%
+  mutate(abs_value = abs(value)) %>%
+  group_by(component) %>%
+  slice_max(abs_value, n = 10) %>%
+  ungroup()
+
+ggplot(top_loadings, aes(x = value, y = fct_reorder(terms, abs_value), fill = component)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ component, scales = "free_y") +
+  labs(
+    title = "Top Feature Contributions to PC1 and PC2",
+    subtitle = "Higher absolute values mean stronger influence on the principal component",
+    x = "Loading Value",
+    y = "Feature"
+  ) +
+  theme_minimal()
+
+
+```
+
+In this visualization, we identify which features contribute most strongly to the first two principal components (PC1 and PC2) derived from the employee dataset. For PC1, features related to career progression such as YearsSinceLastPromotion, YearsInMostRecentRole, and YearsAtCompany — have the largest absolute loading values. This suggests that PC1 captures variation in employee tenure and promotion history. For PC2, Salary and Age are the most influential features. This indicates that PC2 reflects overall employee seniority and compensation.Overall, this PCA feature contribution plot helps us understand the underlying dimensions of variation in the workforce: one dimension based on career longevity and another dimension based on seniority and income.
+
+**Final Insights**
+This project provided a multi-dimensional view of employee data through six diverse visualizations. It began with simple descriptive statistics and evolved into complex model-based insights using PCA and clustering. Several key patterns emerged: younger employees and those working overtime exhibited higher attrition rates, and certain departments and roles were consistently associated with higher turnover. The PCA-based clustering revealed underlying employee groupings, while the final bubble chart clearly outlined compensation disparities across roles. These findings can inform HR strategies in talent retention, targeted support, and role-specific policy adjustments. The visualizations combined clarity with analytical depth, demonstrating how data science can drive actionable organizational insights.

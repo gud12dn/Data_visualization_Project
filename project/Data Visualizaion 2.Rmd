@@ -1,0 +1,165 @@
+---
+title: "Stat436 homework3"
+output: html_document
+date: "2025-03-17"
+name: Hyoungwoo Kim
+---
+
+### [Homework 3: SOCIAL DATA VISUALIZATION]
+
+Perhaps the best way to learn data visualization is to (a) study the work of those who are more experienced and (b) practice. One neat way to go about this is to participate in social data visualization activities, like TidyTuesday or the 30DayChartChallenge. This exercise will ask you to study examples of/prepare your own submission to one of these activities.
+
+a\.Pick any prompt from either TidyTuesday or 30DayChartChallenge that interests you. Without writing any code or searching online, briefly brainstorm some submission ideas. What do you think would be most interesting to show from the data? What obstacles do you anticipate and how could they be resolved? Summarize your thoughts.
+
+**Prompt (Dataset):** [https://github.com/rfordatascience/tidytuesday/blob/main/data/2024/2024-05-21/readme.md#emissionscsv/](https://github.com/rfordatascience/tidytuesday/blob/main/data/2024/2024-05-21/readme.md#emissionscsv/#){.uri}\
+
+**(Article):** <https://www.storybench.org/five-ways-organizations-are-visualizing-carbon-emissions/>
+
+In this assignment, I intend to analyze carbon emissions using the Carbon Majors Emissions dataset provided by TidyTuesday. This dataset records annual CO₂ emissions from major corporations and nations between 1854 and 2023, categorized by entity type (investor-owned, state-owned, nation-state) and commodity type (oil, coal, natural gas, cement). Understanding long-term emission trends is crucial for addressing climate change. This dataset allows us to explore how different entities contribute to global emissions and how these contributions have evolved over time.
+
+**interesting visualization ideas:**
+
+**First Idea:**
+I plan to visualize the changes in carbon emissions over time by entity type using a time-series graph. This will highlight the differences between corporate and government-backed emissions, illustrating how state-owned entities have played an increasingly dominant role in recent decades.
+
+**Second Idea:**
+Another approach is to analyze long-term commodity-based trends in emissions (oil, coal, natural gas, cement). A stacked area chart could reveal how the primary sources of emissions have shifted with industrial development, particularly the rise of natural gas as a transition fuel and the continued dominance of coal.
+
+**Anticipated Issues and Potential Solutions:**
+
+**First:**Directly comparing corporations and nation-states may result in readability issues due to significant differences in emission scales. To address this, emissions could be transformed using a logarithmic scale or visualized separately for corporations and nation-states.
+
+**Second:**Selecting effective graphical encodings such as line charts, area charts and treemaps can be challenging due to the data's complexity and variety. To resolve this, experimenting briefly with different visualization types or incorporating interactive elements can help clarify the insights.
+
+b\.Search for some publicly posted submissions for your prompt. Pick two and comment their designs. Compare and contrast their choices of graphical encodings. What effective design decisions did the authors make that you could potential imitate? What might you have done differently?
+
+**Visualization 1**
+![Visualization 1](/Users/hyoungwookim/Library/Mobile Documents/com~apple~CloudDocs/OurWorldinData-Treemap.png)
+
+**Visualization 2**
+![Visualization 1](/Users/hyoungwookim/Library/Mobile Documents/com~apple~CloudDocs/Guardian-top-20-ff-companies.png)
+
+**Compare and contrast their choices of graphical encodings:**
+The first visualization uses a treemap to display cumulative carbon emissions by country and region, leveraging size and color for immediate comparison. This method is effective in showing hierarchical relationships, allowing viewers to quickly identify the largest contributors like the USA, EU, and China. Additionally, the distinct colors categorize emissions by continent, highlighting regional disparities at a glance. However, while the treemap excels in representing proportions, it struggles with clarity for smaller entities due to limited space.
+
+The second visualization takes a different approach by using a bar chart, which clearly distinguishes between state-owned and investor-owned companies using dual-color encoding. Unlike the treemap, this method prioritizes individual company comparisons rather than regional groupings. The descending order sorting enhances readability, ensuring that the most significant contributors are immediately visible. However, the static nature of this chart makes it difficult to observe historical trends.
+
+**What effective design decisions did the authors make that you could potentially imitate?**
+The treemap's clear hierarchical grouping and distinct regional coloring in the first graph effectively communicates differences in emissions between regions and countries, making major contributors instantly noticeable. Additionally, varying font sizes and positioning based on emission magnitudes enhance readability. The second graph’s clear division into state-owned versus investor-owned companies is highly effective, making comparative analysis straightforward. This categorization could be replicated to enhance the clarity of entity comparisons in my own visualizations.
+
+**What might you have done differently:**
+While the treemap efficiently shows relative proportions, it struggles with clearly presenting smaller entities due to limited space. To address this, I would add interactive tooltips or an option to zoom into specific regions to improve clarity for smaller entries. The second bar graph clearly conveys overall totals but lacks detail on emissions trends over time. I would complement this static view by adding an interactive feature or supplemental chart to display temporal changes, allowing viewers to explore historical emission trends more comprehensively.
+
+
+
+c\. Prepare your own response to the prompt. Your visulization and commentary should be complete enough that you could hypothetically use it as a blog post/ social media thread if you were participating in the challenge publicly. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tsibble)
+library(lubridate)
+```
+
+```{r}
+emissions <- read_csv("/Users/hyoungwookim/Desktop/2025 Spring/stat436_s25")
+```
+
+```{r}
+
+data_summary <- emissions %>%
+  mutate(commodity_group = case_when(
+    commodity == 'Oil & NGL' ~ 'Oil',
+    commodity == 'Natural Gas' ~ 'Natural Gas',
+    commodity %in% c('Anthracite Coal', 'Bituminous Coal', 'Lignite Coal',
+                     'Metallurgical Coal', 'Sub-Bituminous Coal', 'Thermal Coal') ~ 'Coal',
+    commodity == 'Cement' ~ 'Cement'
+  )) %>%
+  group_by(year, commodity_group) %>%
+  summarise(total_emissions = sum(total_emissions_MtCO2e, na.rm = TRUE), .groups = "drop") 
+
+```
+
+```{r}
+ggplot(data_summary, aes(x = year, y = total_emissions, fill = commodity_group)) + 
+  geom_area(alpha = 0.9, colour = "white") + 
+  scale_fill_manual(values = c("Coal" = "#993404",
+                               "Oil" = "#F57C00",
+                               "Natural Gas" = "#0097A7", 
+                               "Cement" = "#BA68C8")) + 
+  labs(title = "Carbon Majors & Global CO2 Emissions (1854–2023)", 
+       x = "Year", y = "Emissions (MtCO2e)") + 
+  geom_vline(xintercept = 2015, linetype = "dotted", color = "#008080") + 
+  annotate("text", x = 2015, y = 40000, label = "Paris Agreement", 
+           color = "#008080", size = 4, fontface = "bold", vjust = -1) + 
+  scale_x_continuous(breaks = seq(1860, 2020, by = 20)) + 
+  scale_y_continuous(labels = scales::comma) + 
+  theme_minimal(base_size = 14) + 
+  theme(legend.position = "bottom")
+
+
+```
+
+```{r}
+
+entity_summary <- emissions %>%
+  group_by(year, parent_type) %>%
+  summarise(total_emissions = sum(total_emissions_MtCO2e, na.rm = TRUE), .groups = "drop") %>%
+  filter(year >= 1930) 
+```
+
+
+```{r}
+ggplot(entity_summary, aes(x = year, y = total_emissions, color = parent_type, group = parent_type)) +
+  geom_line(linewidth = 0.8) +
+  scale_color_manual(values = c("Investor-owned Company" = "#D81B60",
+                                "Nation State" = "#1E88E5", 
+                                "State-owned Entity" = "#FFC107")) +
+  labs(title = "Emissions by Entity Type (1930–2023)", 
+       x = "Year", y = "EMISSIONS (MtCO2e)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+```{r}
+
+filtered_data <- emissions %>%
+  filter(year >= 1980) %>%
+  group_by(year, commodity) %>%
+  summarise(total_emissions = sum(total_emissions_MtCO2e, na.rm = TRUE), .groups = "drop")
+
+```
+
+```{r}
+
+ggplot(filtered_data, aes(x = year, y = total_emissions)) +
+  geom_line(color = "black", linewidth = 1) + 
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), 
+              se = TRUE, fill = "red", color = "red", alpha = 0.2) + 
+  facet_wrap(~commodity, scales = "free_y") +  
+  labs(title = "Carbon Emissions by Energy Source",
+       x = "Year", y = "Total Emissions (MtCO2e)") +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold", size = 12))
+
+```
+
+
+**commentary:**
+The patterns of carbon emissions have undergone significant shifts over the decades due to industrialization, policy changes, and the evolution of energy sources. This analysis examines data related to carbon emissions, focusing on the contribution of different fossil fuel sources, the role of various entity types in emissions, and how specific energy commodities have trended over time. The following three visualizations illustrate these insights.
+
+The first visualization presents the cumulative contribution of different energy sources—Coal, Oil, Natural Gas, and Cement—to global CO₂ emissions since 1854. This stacked area chart highlights the steady rise in emissions, with a notable acceleration after the mid-20th century. Coal has been the dominant contributor, followed by Oil and Natural Gas, reflecting the energy industry's historical reliance on these fuels. The sharp increase in emissions post-1950 coincides with rapid industrial expansion, and despite international agreements such as the Paris Agreement (2015), emissions have continued to rise, though with some variation across energy sources.
+
+The second visualization analyzes carbon emissions by entity type, categorizing them into Investor-owned companies, Nation States, and State-owned entities. Initially, Investor-owned companies led the growth in emissions, but since 2000, State-owned entities have surpassed them and now contribute the largest share. Nation States have also played a significant role, though their emissions levels have fluctuated over time. This shift suggests a changing landscape where government-backed energy projects, particularly in emerging economies, are becoming dominant in emissions output.
+
+The third visualization breaks down emissions by specific energy commodities, including various types of coal, oil, and gas. Coal-based emissions (Anthracite, Bituminous, Thermal, etc.) have generally increased, though some have plateaued in recent years. Oil & NGL emissions have shown persistent growth, indicating continued reliance on petroleum products. Natural Gas emissions have steadily risen, emphasizing its role as a transitional energy source. Cement, though a smaller contributor overall, has exhibited stable and increasing emissions, reflecting sustained global construction activity.
+
+Together, these visualizations provide a comprehensive picture of how energy production and emissions have evolved, shaped by industrial priorities and geopolitical shifts. While certain energy sources have surged in dominance, others have declined, reflecting broader changes in global energy consumption. Given these trends, one might ask: How will renewable energy sources alter this trajectory in the coming decades? 

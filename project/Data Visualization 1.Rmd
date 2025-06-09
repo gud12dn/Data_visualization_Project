@@ -1,0 +1,100 @@
+---
+title: "Visualization Fundamentals"
+author: "Hyoungwoo Kim"
+output: html_document
+date: "2025-02-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(nycflights13)
+```
+
+
+```{r}
+my_theme <- theme_classic() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    strip.text = element_text(size = 14),
+    panel.grid.minor = element_blank()
+  )
+theme_set(my_theme)
+```
+
+## NYC Flights Analysis
+
+### **(a) Create a new column for average flight speed**
+```{r}
+# Load the NYC flights dataset and select relevant columns
+flights_speed <- flights |> 
+  select(carrier, air_time, distance) |> 
+  mutate(speed = distance / (air_time / 60)) |> # Convert air_time to hours and compute speed
+  drop_na() # Remove any rows with missing values
+
+# Display the first few rows
+head(flights_speed)
+```
+
+### **(b) Analyze variation in flight speed across carriers**
+```{r}
+# Clean Boxplot without Jitter
+speed_plot <- ggplot(flights_speed, aes(x = reorder(carrier, speed, median), y = speed, fill = carrier)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.6) + 
+  coord_cartesian(ylim = c(0, 600)) + # Adjust y-axis range
+  labs(
+    title = "Variation in Flight Speed Across Carriers",
+    x = "Carrier",
+    y = "Average Speed (miles per hour)"
+  ) +
+  theme(legend.position = "none")
+
+# Display the plot
+speed_plot
+
+```
+
+## Pokemon Analysis
+
+### **(a) Compute Attack-to-Defense Ratio**
+```{r}
+pokemon <- read_csv("/Users/hyoungwookim/Desktop/2025 Spring/stat436_s25/poke.csv")
+
+pokemon <- pokemon |> 
+  mutate(attack_defense_ratio = Attack / Defense)
+
+head(pokemon)
+```
+
+### **(b) Compute Median Attack-to-Defense Ratio per Type**
+```{r}
+pokemon_median <- pokemon |> 
+  group_by(type_1) |> 
+  summarise(median_ratio = median(attack_defense_ratio, na.rm = TRUE)) |> 
+  arrange(desc(median_ratio))
+
+head(pokemon_median)
+```
+
+### **(c) Plot Attack vs. Defense by Type**
+```{r}
+pokemon_plot <- ggplot(pokemon, aes(x = Attack, y = Defense, color = type_1)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~ reorder(type_1, attack_defense_ratio, median)) +
+  labs(
+    title = "Attack vs. Defense by Pokemon Type",
+    x = "Attack",
+    y = "Defense"
+  ) +
+  theme_minimal()
+
+pokemon_plot
+```
+
+### **(d) Proposed Interactive Visualization**
+- **Question:** How does the attack-defense balance change across different Pokemon generations?
+- **Interactive Feature:** Implement a **slider or dropdown menu** to filter Pokemon by generation.
+- **Expected Outcome:** Users can explore how Pokemon stats evolved over generations, identifying trends in attack vs. defense.
+
