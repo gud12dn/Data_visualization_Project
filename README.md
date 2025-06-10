@@ -1,7 +1,5 @@
 # Data_visualization_Project
 
-# 📊 Data Visualization Projects (STAT 436)
-
 This repository contains a collection of data visualization projects and assignments
 
 Each project demonstrates the application of various data visualization techniques using R and ggplot2, covering topics such as:
